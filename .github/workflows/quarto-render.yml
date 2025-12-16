@@ -40,16 +40,16 @@ jobs:
         with:
           cache-version: 1
       
-      # Step 4: Install Python and its dependencies
-      - name: "Install Python"
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-          cache: 'pip'
-      - name: "Install Python Dependencies"
-        run: | 
-          pip install pyyaml jupyter nbformat
-          pip install -r requirements.txt
+      # # Step 4: Install Python and its dependencies
+      # - name: "Install Python"
+      #   uses: actions/setup-python@v5
+      #   with:
+      #     python-version: '3.x'
+      #     cache: 'pip'
+      # - name: "Install Python Dependencies"
+      #   run: | 
+      #     pip install pyyaml jupyter nbformat
+      #     pip install -r requirements.txt
 
       # Step : Render and Publish the Quarto book using GitHub actions
       # Built-in {{GITHUB_PAT}} environment variable is used to authenticate with GitHub. 
