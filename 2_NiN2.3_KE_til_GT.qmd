@@ -1,0 +1,125 @@
+---
+title: "2. Oversett ANO NiN2.3 kartleggingsenheter til grunntyper"
+format: 
+  pdf: 
+    code-fold: false
+execute: 
+  output: false
+---
+
+(Forklaring)
+
+```{r, echo=FALSE, results='hide'}
+#| code-fold: true
+#| code-summary: "Klikk for å vise pakker"
+# Sett tegnkodingen for teksthåndtering til norsk bokmål med UTF-8-encoding 
+Sys.setlocale("LC_CTYPE", "nb_NO.UTF-8")  
+
+# Last inn pakker 
+packages <- c("dplyr","sf", "purrr", "jsonlite", "stringr") 
+sapply(packages, require, character.only = TRUE)  
+```
+
+## 2.1 Last inn det forberedede ANO-datasettet
+
+```{r}
+df_ano  <- read.csv("data/df_ano.csv")
+```
+
+## 2.2 Oversett fra kartleggingsenhet til grunntyper
+
+For å finne koblingen mellom NiN 2.3 KE og GT bruker vi Artsdatabankens API for NiN 2.3.
+
+Først lager vi en funksjon som henter ut NiN 2.3 GT ved å bruke NiN 2.3 KE-kode.
+
+```{r}
+
+get_grunntyper      <- function(nin_kode) {
+  
+
+  # Lag riktig URL
+  url <- paste0(
+    "https://nin-kode-api.artsdatabanken.no/v2.3/koder/hentkode/",
+    URLencode(paste0("NA ", nin_kode))
+  )
+  
+  # Hent JSON – prøv, og returner tom vektor hvis feiler
+  res <- tryCatch(fromJSON(url), error = function(e) return(NULL))
+  
+  if (is.null(res) || length(res$Grunntyper) == 0) {
+    return(NA)  # ingen grunntyper funnet
+  }
+  
+  res$Grunntyper$Kode$Id
+  
+  # Returnér grunntypekode
+  return(res$Grunntyper$Kode$Id)
+  
+}
+```
+
+Siden funksjonen bruker omtrent ett sekund per type kjører vi dette kun per unike type og ikke for hele datasettet.
+
+```{r}
+ano_KE            <- df_ano %>%
+                      select(kartleggingsenhet_1m2, kartleggingsenhet_250m2) %>%
+                      unlist(use.names = FALSE) %>% 
+                      unique()
+```
+
+Deretter kjører vi funksjonen for listen med KE. Dette tar et par minutter.
+
+```{r}
+
+ano_KE_GT         <- tibble(ano_KE = ano_KE) %>%
+                      # Kjør funksjonen "get_grunntyper" 
+                      mutate(ano_GT = purrr::map(ano_KE, get_grunntyper)) %>%
+                      # Hent ut alle grunntypene og lag én rad for hver. Dette dupliserer globalid
+                      tidyr::unnest(ano_GT)
+
+```
+
+Noen grunntyper ligger ikke inne i API-en og legges derfor til her manuelt.
+
+```{r}
+ano_KE_GT <- ano_KE_GT %>%
+  mutate(ano_GT = case_when(
+    ano_KE == "I1-C-1" ~ "I1-1",
+    ano_KE == "T40-C-1" ~ "T40-1",
+    ano_KE == "T41-C-1" ~ "T41-1",
+    ano_KE == "T42-C-1" ~ "T42-1",
+    ano_KE == "T43-C-1" ~ "T43-1",
+    ano_KE == "T44-C-1" ~ "T44-1",
+    TRUE ~ ano_GT
+  ))
+```
+
+Koble det oversatte datasettet til df_ano-datasettet. Her blir det mest ryddig å jobbe med 1m2 og 250m2 hver for seg.
+
+```{r}
+df_ano_GT_1m2     <- df_ano %>%
+                      # Fjern 250m2 kolonnen
+                      select(-kartleggingsenhet_250m2) %>%
+                      # Legg til GT for kartleggingsenhet_1m2
+                      left_join(ano_KE_GT %>%
+                                  # Endre navn slik at de kan slås sammen
+                                  rename(kartleggingsenhet_1m2=ano_KE)
+                                )
+
+df_ano_GT_250m2   <- df_ano %>%
+                      # Fjern 1m2 kolonnen
+                      select(-kartleggingsenhet_1m2) %>%
+                      # Legg til GT for kartleggingsenhet_250m2
+                      left_join(ano_KE_GT %>%
+                                  # Endre navn slik at de kan slås sammen
+                                  rename(kartleggingsenhet_250m2=ano_KE)
+                                )
+```
+
+## 2.3 Eksporter datasettene
+
+```{r}
+df_ano_GT_1m2     %>% write.csv("data/df_ano_GT_1m2.csv", row.names = F)
+
+df_ano_GT_250m2   %>% write.csv("data/df_ano_GT_250m2.csv", row.names = F)
+```

@@ -1,0 +1,60 @@
+---
+title: "Innledning"
+---
+
+Arealrepresentativ naturovervåking (ANO) er et nasjonalt kartleggings- og overvåkingsprogram, finansiert av Miljødirektoratet. I ANO overvåkes naturtyper og vegetasjon, og ANO er etablert som et langsiktig program der tidsserier av data vil gjøre det mulig å følge endringer i natur over tid. Slike langtidsserier er verdifulle for vår forståelse av endringer i naturen.  
+
+Programmet startet i 2020, og det er i perioden 2020-2025 etablert over 1000 overvåkingslokaliteter i norsk natur. I løpet av sesong 2024 var alle lokaliteter etablert og kartlagt i felt, og i sesong 2025 startet andre omdrev med gjenbesøk av tidligere kartlagte lokaliteter. Samtlige vil få gjenbesøk i perioden 2026-30. En lokalitet er et kvadrat på 500 × 500 m i naturen (heretter kalt ANO-flate), valgt ut tilfeldig fra SSB sitt rutenettverk SSB500. På hver ANO-flate er det kartlagt 18 punkter, og på hvert av disse 18 punktene er det samlet inn naturtypedata og vegetasjonsdata. Det finnes altså over 18 000 punkter med data i ANO-databasen. 
+
+All naturtypekartlegging i ANO følger Natur i Norge (NiN), og har fra oppstartsåret 2020 frem til og med sesong 2025 fulgt NiN versjon 2.3. Fra og med 2026 skal registrering av naturtyper i overvåkingsprogrammet følge den oppdaterte versjon NiN 3.0. Versjon 3.0 er, til tross for at systemkjernen i NiN er den samme, såpass forskjellig at naturtypedata samlet med versjon 2.3 ikke vil være direkte kompatibelt med naturtypedata innsamlet etter NiN 3.0; man vil få et gammelt datasett (2020-2025) og et nytt fra 2026 og fremover. Dermed oppstår et behov for å gjøre det gamle datasettet sammenlignbart med det nye. Dette er avgjørende for å sikre kontinuitet i dataene, og dermed tidsseriene, slik at data fra overvåkingsprogrammet faktisk kan benyttes til analyser av endringer i naturtilstand og arealbruk over tid.
+
+Formålet med dette konkrete arbeidet har vært å utvikle, dokumentere og anvende en metodikk for oversetting av naturtypedata i ANO fra NiN versjon 2.3 til NiN versjon 3.0. Det sier seg selv at en oversettelsesmetodikk ikke kan gjøres per ANO-punkt, eller på lokalitetsnivå, men at vi for hver av typene som er kartlagt i ANO lager en generell oversettelse fra typer i NiN 2.3 til tilsvarende typer i NiN 3.0.
+
+Oversettelsesarbeidet bygger på eksisterende systemdokumentasjon for NiN 3.0, særlig oversettelsesnøkler og definisjoner publisert av Artsdatabanken og i NHMs systemdokumentasjon (Halvorsen 2025). Arbeidet tar utgangspunkt i kartleggingsenheter (KE) på skalaene 1:5 000 (1 m²) og 1:20 000 (250 m²), slik disse er registrert i ANO, og følger en trinnvis prosess der data først forberedes og standardiseres, deretter oversettes mellom kartleggingsenheter og grunntyper (GT) innen NiN 2.3, videre til grunntyper i NiN 3.0, og til slutt til kartleggingsenheter i NiN 3.0.
+
+For en del av typene er automatiske oversettelser mulig – det vil si at en type i NiN 2.3 kan oversettes direkte til én bestemt type i NiN 3.0. En slik direkte 1:1 oversettelse er langt fra mulig for alle kartlagte naturtyper i ANO, og ofte vil en type i NiN 2.3 kunne oversettes til flere tilsvarende typer i NiN 3.0. I de tilfellene har vi måttet gjøre manuelle vurderinger og benytte supplerende data fra ANO-databasen som for eksempel artsregistreringer i vegetasjonsrutene, tresjiktsdekning og andre variabler registrert per punkt. Artsdataene fra ANO-databasen har vært brukt sammen med NiN-dokumentasjon, blant annet «Artstabeller og annen tilrettelagt dokumentasjon for variasjonen langs viktige LKM» (Halvorsen et al. 2016). Det er særlig gradienter langs kalkinnhold, vannmetning og uttørkingsfare som har vært avgjørende for å få en god oversettelse. Det finnes også eksempler at typer fra NiN 2.3 har «gått ut» av systemet som følge av endringer i typeinndelingene og definisjonsgrunnlaget. Her har vi måttet bruke grunnleggende økologisk kunnskap slik det er satt sammen i NiN-systemets dokumentasjon for få entydige oversettelser.
+
+Det er også tilfeller hvor en entydig oversettelse ikke vil være mulig basert på de tilgjengelige dataene. Dette gjelder for en del av typene i skog, hvor vi har måttet gjøre noen antagelser.
+
+I NiN 2.3 ble skog på fastmark kartlagt som «fastmarksskogsmark» (T4), fordelt på tilhørende kartleggingsenheter. I NiN 2.3 beror typeinndelingen på økologiske gradienter uten særlige hensyn i selve typeinndelingen til hvor menneskepåvirket skogen er. 
+
+I NiN 3.0 gjelder nye prinsipper for systematisering av skogsmark, hvor ulik grad av menneskepåvirkning har stor betydning: 
+
+-   NA-TB01 er hovedtype «fastmarksskogsmark» og omfatter all lite endret skogsmark på fastmark som ikke påvirkes av flom eller har nakent sandsubstrat. 
+
+```{=html}
+<!-- -->
+```
+-   NA-TI01 er klart endret skogsmark. Det er skogsmark som er gjennomgripende påvirket av skogbruksvirksomhet, for eksempel grøfting, markforstyrrelse, intensiv hogst eller treslagsskifte. 
+
+```{=html}
+<!-- -->
+```
+-   NA-TM06 er sterkt endret skogsmark og omfatter skogsmark som har oppstått som et mellomsuksesjonsstadium, hovedsakelig etter tilplanting av sterkt endret mark (åker etc.) eller ved særlig sterk påvirkning fra skogbruksvirksomhet. 
+
+NiN 3.0 deler altså fastmarksskogsmark inn i lite, sterkt og klart endret mark etter et helt nytt kriteriesett som ikke finnes i NiN 2.3. Dermed er det ikke mulig å oversette entydig fra områder tidligere kartlagt innenfor hovedtype T4 og T38 til kartleggingsenheter for fastmarksskogsmark i NiN 3.0. 
+
+I vår oversettelse av ANO-data har vi derfor valgt å oversette all fastmarksskogsmark T4 etter NiN 2.3 til hovedtype NA-TB01 fastmarksskogsmark i NiN 3.0; det vil si vi antar at all skog kartlagt i T4 er lite endret skog. Dette er med stor sannsynlighet ikke korrekt for samtlige kartlagte ANO-punkter. Det vil sikkert være tilfeller av klart og kanskje også sterkt endret skog blant punkter kartlagt som T4 i perioden 2020-2025. Vår begrensning er at det ikke finnes informasjon i data-settet som gir en entydig oversettelse. 
+
+Skillet mellom lite endret, klart endret og sterkt endret skog vil derfor først bli tilgjengelig i datasettet etter neste omdrev av ANO, når alle lokaliteter er kartlagt etter NiN 3.0.  
+
+Det er lagt stor vekt på å dokumentere graden av usikkerhet i oversettelsene. Resultatet er at hver oversettelse kan klassifiseres etter hvor robust og pålitelig den vurderes å være, fra svært gode til dårlige oversettelser. Dette er lagt inn i egne kolonner i data-matrisen som følger leveransen.   
+
+Arbeidet resulterer i tre leveranser:  
+
+1.  Dette prosjektnotatet, som inneholder dokumentasjon av oversettelsesmetodikk, herunder hvordan eksisterende systemdokumentasjon er blitt hensyntatt og oppdragstakers egne vurderinger som bygger på eksisterende dokumentasjon \
+     
+
+```{=html}
+<!-- -->
+```
+2.  Excel-fil med alle SurveyPoint-registreringer i ANO i perioden 2019-2025, med nye kolonner for NiN 3-oversettelser av KE 1:5000, KE 1:20 000 og NiN-beskrivelsesvariabler, samt egne kolonner for eventuell usikkerhet i oversettelsene.  
+
+```{=html}
+<!-- -->
+```
+3.  Skript som produseres i forbindelse med arbeidet tilgjengeliggjøres åpent via GitHub: . 
+
+Samlet sett legger dette arbeidet til rette for at ANO kan gå over til NiN 3.0 uten å miste verdien av eksisterende dataserier. Metodikken som presenteres her er ment å være transparent, etterprøvbar og fleksibel. En del av oversettelsene vil kunne justeres og forbedres etter at lokalitetene har vært besøkt for andre gang og re-kartlagt. Det vil derfor være behov for videre arbeid og løpende justeringer og forbedringer på oversettelse mellom NiN 2.3 og NiN 3.0 i ANO-data.  
+
+Vi takker Miljødirektoratet for godt samarbeid undervegs, og især Rune Halvorsen for råd og rask hjelp underveis i oppdraget.  

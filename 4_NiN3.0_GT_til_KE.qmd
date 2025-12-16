@@ -1,0 +1,227 @@
+---
+title: "4. Oversett ANO NiN 3.0 grunntyper til kartleggingsenheter"
+format: 
+  pdf: 
+    code-fold: false
+execute: 
+  output: false
+---
+
+```{r, echo=FALSE, results='hide'}
+# Sett tegnkodingen for teksthåndtering til norsk bokmål med UTF-8-encoding 
+Sys.setlocale("LC_CTYPE", "nb_NO.UTF-8")  
+
+# Last inn pakker 
+packages <- c("dplyr","sf", "stringr") 
+sapply(packages, require, character.only = TRUE)  
+```
+
+## 4.1 Last inn ANO-data
+
+```{r}
+# Last inn data
+df_ano_NiN3_GT_H_1m2    <- read.csv("data/df_ano_NiN3_GT_H_1m2.csv")
+df_ano_NiN3_GT_H_250m2  <- read.csv("data/df_ano_NiN3_GT_H_250m2.csv")
+```
+
+## 4.2 Hent oversettelsesnøkkel mellom grunntyper og kartleggingsenheter fra Artsdatabanken
+
+Bruker her samme Excel-ark som lastet ned i kap. 3 (nin3.xlsx), men arkene GT_KLE_M005 og GT_KLE_M020 for å oversette fra NiN 3.0 grunntyper til kartleggingsenheter 1:5000 og 1:20 000.
+
+```{r}
+# Les inn oversettelsesnøkkelen mellom grunntyper og kartleggingsenheter
+GT_KE5_konvertering   <- readxl::read_excel("data/nin3.xlsx", sheet = "GT_KLE_M005")
+GT_KE20_konvertering  <- readxl::read_excel("data/nin3.xlsx", sheet = "GT_KLE_M020")
+```
+
+Av en eller annen grunn er flere av radene duplisert, antagelig pga. oversettelsesfeil. Disse filene må derfor kvalitetssikres på forhånd. Vi henter først ut duplikater, men kvalitetssikrer kun for de som er i ANO-datasettet ettersom det er over 80 duplikater (29 i M005 og 53 i M020).
+
+```{r}
+#| echo: false
+#| output: true
+
+GT_KE5_konvertering_dup <- GT_KE5_konvertering %>%
+  dplyr::filter(duplicated(.) | duplicated(., fromLast = TRUE)) %>%
+  group_by(Grunntype_kode) %>%
+  slice(1) %>%
+  # Filtrer ut de grunntypene som er i ANO-datasettet
+  filter(Grunntype_kode %in% gsub("NA-","",df_ano_NiN3_GT_H_1m2$ano_GT_NiN3_0))
+
+GT_KE20_konvertering_dup <- GT_KE20_konvertering %>%
+  dplyr::filter(duplicated(.) | duplicated(., fromLast = TRUE)) %>%
+  group_by(Grunntype_kode) %>%
+  slice(1) %>%
+  # Filtrer ut de grunntypene som er i ANO-datasettet
+  filter(Grunntype_kode %in% gsub("NA-","",df_ano_NiN3_GT_H_1m2$ano_GT_NiN3_0))
+
+```
+
+For M005 er det kun verdier for OA02, TA01 og TK01 som er duplisert. De to duplikatene for OA er reelle duplikater. Ettersom TA01 ikke vil ha en god manuell oversettelse senere (se Manuell oversettelser), så fikser vi ikke disse. TK01 er en reell duplikat. Vi gjør derfor ingen endringer i M005-datasettet utenom å fjerne duplikater.
+
+For M020 er det flere verdier for TA01 som er duplisert. Ettersom disse ikke vil ha en god manuell oversettelse senere (se Manuell oversettelser), så fikser vi ikke disse nå. Da står vi igjen med to duplikater. VB01-M020-01 og VB01-09 er feilskriving, hvor M020_kode egentlig skal være VB01-M020-02. VK02-M020-02 og VK02-04 er en reell duplikat, så denne gjør vi ikke noe med.
+
+```{r}
+# M005 --------------------------------------------------------------------------------
+GT_KE20_konvertering <- GT_KE20_konvertering %>%
+   distinct()
+
+# M020 --------------------------------------------------------------------------------
+
+GT_KE20_konvertering <- GT_KE20_konvertering %>%
+  group_by(Grunntype_kode) %>%
+  # Legg til en id for dupliserte verdier
+  mutate(dup_id = row_number()) %>%
+  ungroup() %>%
+  # Endre på feil, men kun for den dupliserte verdien
+  mutate(
+    M020_kode = case_when(
+      # VB01-09 skal egentlig også oversettes til VB01-M020-02 og ikke bare VB01-M020-01
+      M020_kode == "VB01-M020-01" & Grunntype_kode == "VB01-09" & dup_id == 1 ~ "VB01-M020-02",
+      TRUE ~ M020_kode  
+    )
+  ) %>%
+  select(-dup_id) %>%
+  # Fjern de resterende duplikatene vi valgte å ikke gjøre noe med
+  distinct()
+
+```
+
+I tillegg er det noen feilskrivinger i oversettelsene. VB01-10 skal oversettes til VB01-M020-03.
+
+```{r}
+
+# M020 --------------------------------------------------------------------------------
+
+GT_KE20_konvertering <- GT_KE20_konvertering %>%
+  # Endrer på feil
+  mutate(
+    M020_kode = case_when(
+      # VB01-10 skal egentlig oversettes til VB01-M020-03
+      M020_kode == "VB01-M020-02" & Grunntype_kode == "VB01-10" ~ "VB01-M020-03",
+      TRUE ~ M020_kode  
+    )
+  )
+
+```
+
+## 4.3 Oversett NiN 3.0 grunntyper til kartleggingsenheter
+
+(Forklaring)
+
+Funksjon for å oversette fra grunntyper til kartleggingsenheter.
+
+```{r}
+# Funksjon for å oversette
+convert_GT_KE <- function(df_ano, GT_KE5_konvertering, GT_KE20_konvertering) {
+  
+  df_ano %>%
+    
+    # Fjern "NA-" fra ano_GT_NiN3_0
+    mutate(ano_GT_NiN3_0 = str_replace_all(ano_GT_NiN3_0, "NA-", "")) %>%
+    
+    # Legg til NiN 3.0 M0005-kode (kartleggingsenhet 1:5000)
+    left_join(GT_KE5_konvertering,
+              by = c("ano_GT_NiN3_0" = "Grunntype_kode")) %>%
+    
+    # Legg til NiN 3.0 M0020-kode (kartleggingsenhet 1:20000)
+    left_join(GT_KE20_konvertering,
+              by= c("ano_GT_NiN3_0" = "Grunntype_kode"))
+  
+}
+
+
+```
+
+Kjør funksjonen over på de to ANO-datasettene med NiN 3.0 grunntyper.
+
+```{r}
+
+# Kjør funksjonen på hvert datasett
+df_ano_NiN3_KE_1m2      <- convert_GT_KE(df_ano_NiN3_GT_H_1m2, 
+                                         GT_KE5_konvertering, GT_KE20_konvertering)
+df_ano_NiN3_KE_250m2    <- convert_GT_KE(df_ano_NiN3_GT_H_250m2, 
+                                         GT_KE5_konvertering, GT_KE20_konvertering)
+```
+
+Undersøk de to oversatte datasettene.
+
+```{r}
+
+df_ano_NiN3_KE          <- df_ano_NiN3_KE_1m2 %>%
+                              select(-globalid, -ano_GT, -HT, -GT) %>%
+                              rename(NiN2_3_KE = kartleggingsenhet_1m2) %>%
+                              bind_rows(
+                                df_ano_NiN3_KE_250m2 %>%
+                                  select(-globalid, -ano_GT, -HT, -GT) %>%
+                                  rename(NiN2_3_KE = kartleggingsenhet_250m2)
+                              ) %>%
+                              # Ikke inkluder de som er NA i GT ettersom disse håndteres senere
+                              filter(!is.na(ano_GT_NiN3_0))%>%
+                              unique()
+
+
+```
+
+```{r}
+#| echo: false
+#| output: true
+
+cat("Antall NiN3 M005 med NA: ", sum(is.na(df_ano_NiN3_KE$M005_kode)), "\n")
+cat("Antall NiN3 M005 med ikke-NA: ", sum(!is.na(df_ano_NiN3_KE$M005_kode)), "\n")
+
+cat("Antall NiN3 M020 med NA: ", sum(is.na(df_ano_NiN3_KE$M020_kode)), "\n")
+cat("Antall NiN3 M020 med ikke-NA: ", sum(!is.na(df_ano_NiN3_KE$M020_kode)), "\n")
+```
+
+Ti typer oversettes ikke.
+
+```{r}
+#| echo: false
+#| output: true
+
+cat("Ikke oversatt til M005:", df_ano_NiN3_KE$ano_GT_NiN3_0[is.na(df_ano_NiN3_KE$M005_kode)], "\n")
+
+cat("Ikke oversatt til M020:", df_ano_NiN3_KE$ano_GT_NiN3_0[is.na(df_ano_NiN3_KE$M020_kode)], "\n")
+```
+
+TK01 og TD01 er hovedtyper og oversettes derfor ikke, men håndteres senere (se kap. 5). TA01-79 og 80, FA02-04, 08 og 10, FB01-01, FB03-01, og FC01-02 eksisterer ikke Artsdatabankens oversettelsesark mellom NiN 3.0 grunntyper og kartleggingsenheter (begge typene).
+
+De to typene som tilhører TA01 og resten som tilhører hovedtypegruppe F (Limniske vannmassesystemer) har ikke kartleggingsenheter for M005 og M020, men kun grunntyper. Disse oversettes derfor kun til grunntyper.
+
+```{r}
+
+F_typer <- df_ano_NiN3_KE %>%
+  filter(str_detect(NiN2_3_KE, "F") & str_length(NiN2_3_KE) > 2)
+
+df_ano_NiN3_KE_1m2 <- df_ano_NiN3_KE_1m2 %>%
+  
+  
+  mutate(
+
+    # Fikse F-typer
+    M005_kode = ifelse(ano_GT_NiN3_0 %in% c(F_typer$ano_GT_NiN3_0,
+                                            "TA01-79", "TA01-80"),
+                            ano_GT_NiN3_0,
+                            M005_kode),
+    M020_kode = ifelse(ano_GT_NiN3_0 %in% c(F_typer$ano_GT_NiN3_0,
+                                            "TA01-79", "TA01-80"),
+                            ano_GT_NiN3_0,
+                            M020_kode))
+
+df_ano_NiN3_KE_250m2 <- df_ano_NiN3_KE_250m2 %>%
+  mutate(M005_kode = ifelse(ano_GT_NiN3_0 %in% c(F_typer$ano_GT_NiN3_0,
+                                            "TA01-79", "TA01-80"),
+                            ano_GT_NiN3_0,
+                            M005_kode),
+         M020_kode = ifelse(ano_GT_NiN3_0 %in% c(F_typer$ano_GT_NiN3_0,
+                                            "TA01-79", "TA01-80"),
+                            ano_GT_NiN3_0,
+                            M020_kode))
+```
+
+## 4.4 Eksporter resultater
+
+```{r}
+df_ano_NiN3_KE_1m2    %>% write.csv("data/df_ano_NiN3_KE_1m2.csv", row.names = F)
+df_ano_NiN3_KE_250m2  %>% write.csv("data/df_ano_NiN3_KE_250m2.csv", row.names = F)
+```

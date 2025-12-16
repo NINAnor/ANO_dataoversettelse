@@ -1,0 +1,143 @@
+---
+title: "6. Oversettelse av beskrivelsesvariabler"
+format: 
+  pdf: 
+    code-fold: false
+execute: 
+  output: false
+---
+
+```{r, echo=FALSE, results='hide'}
+
+# Sett tegnkodingen for teksthåndtering til norsk bokmål med UTF-8-encoding 
+Sys.setlocale("LC_CTYPE", "nb_NO.UTF-8")  
+
+# Last inn pakker 
+packages <- c("dplyr", "sf", "stringr", "tidyr", "knitr", "kableExtra") 
+sapply(packages, require, character.only = TRUE)  
+```
+
+I tillegg til å oversette kartleggingsenheter mellom NiN 2.3 og NiN 3.0 skal også beskrivelsesvariabler oversettes.
+
+## 6.1 Last inn data
+
+```{r}
+# Last inn 2018-2024 data
+ano2024   <- st_read("data/naturovervaking_eksport.gdb", layer="ANO_SurveyPoint")
+
+# Last inn 2025 data
+ano2025   <- st_read("data/ANO2025.gpkg", layer="surveypoint")
+
+
+```
+
+I de to datasettene ANO-datasettene finnes disse beskrivelsesvariablene:
+
+```{r}
+#| echo: false
+#| output: true
+
+cat("Beskrivelsesvariabler i ANO 2020-2024:", names(ano2024)[str_detect(names(ano2024), "bv_")], "\n")
+cat("Beskrivelsesvariabler i ANO 2025:", names(ano2025)[str_detect(names(ano2025), "bv_")], "\n")
+```
+
+## 6.2 Oversettelse av beskrivelsesvariabler
+
+Vi bruker Vedlegg 9 i Halvorsen (2025) for å oversette. Her legger vi ikke til oversettelsessikkerhet ettersom oversettelsene generelt er gode.
+
+```{r}
+ano2024_bv <- ano2024 %>%
+  st_drop_geometry() %>%
+    select(globalid, matches("^bv_"))
+
+ano2025_bv <- ano2025 %>%
+  st_drop_geometry() %>%
+    select(globalid, matches("^bv_"))
+```
+
+### 7GR-GI Grøfting: Grøftingsintensitet
+
+Er det samme som bv_7gr_gi-kolonnene i datasettet. I NiN 3.0 oversettes denne til AD-TE Forventet endringsgjeld etter påvirkning (suksesjonslengde).
+
+Det er en usymmetrisk relasjon med god følsomhet (\<) mellom NiN 2.3 og NiN 3.0 for denne variabelen, som betyr at hele NiN 2.3 variabelen fanges opp i NiN 3.0 variabelen. Variabelens trinn er derimot ikke direkte oversettbar mellom systemene ettersom variabelen i NiN 2.3 består av fem trinn og i NiN 3.0 av sju trinn pluss nulltrinn og endetrinn. Vi gjør derfor en oversettelse med forbehold om at det vil være unøyaktigheter i verdiene. Oversettelsene her tar utgangspunkt i beskrivelsene som er av hvert trinn i hvert system ([NiN 2.3](https://artsdatabanken.no/Pages/181918/) og [NiN 3.0](https://naturinorge.artsdatabanken.no/Variabler/NiN-3.0-V-B-M-AD-GK-W-TE-W))
+
+```{r}
+
+bv_var <- c("7GR-GI_1"="AD-TE_0", # Intakt / Ingen endringsgjeld
+            "7GR-GI_2"="AD-TE_a", # Ubetydelig / Ubetydelig endringsgjeld
+            "7GR-GI_3"="AD-TE_c", # Nokså lite grøftingsinngrep / Betydelig endringsgjeld
+            "7GR-GI_4"="AD-TE_d", # Omfattende grøfting / Vesentlig endringsgjeld
+            "7GR-GI_5"="AD-TE_e", # Gjennomgripende grøfting / Temmelig stor endringsgjeld
+            "7GR-GI_X"=NA) # Verdien for ikke registrert eksisterer ikke i NiN 3.0
+
+ano2024_bv <- ano2024_bv %>%
+  mutate(bv_ad_te = unname(bv_var[bv_7gr_gi]))
+ano2025_bv <- ano2025_bv %>%
+  mutate(bv_ad_te = unname(bv_var[bv_7gr_gi]))
+
+```
+
+### 7JB-BA Jordbruk: Aktuell bruksintensitet
+
+Er det samme som bv_7jb_ba-kolonnene i datasettet. I NiN 3.0 oversettes denne til KM-AH Nåtidig høstingsintensitet.
+
+Det er en inkongruent relasjon (≠) mellom NiN 2.3 og NiN 3.0 for denne variabelen. 7JB-BA er ikke videreført i NiN 3.0, og oversettes derfor ikke.
+
+### 7JB-BT Jordbruk: Beitetrykk
+
+Er det samme som bv_7jb_bt-kolonnene i datasettet. I NiN 3.0 oversettes denne til KM-BT Aktuelt beitetrykk.
+
+Det er en kongruent relasjon (=) mellom NiN 2.3 og NiN 3.0 for denne variabelen, men verdiene er endret. Vi gjør derfor en direkte oversettelse med modifikasjon.
+
+```{r}
+bv_var <- c("7JB-BT_1"="7KM-BT_0",
+            "7JB-BT_2"="7KM-BT_1",
+            "7JB-BT_3"="7KM-BT_2",
+            "7JB-BT_4"="7KM-BT_3",
+            "7JB-BT_5"="7KM-BT_4",
+            "7JB-BT_6"="7KM-BT_y")
+
+ano2024_bv <- ano2024_bv %>%
+  mutate(bv_km_bt = unname(bv_var[bv_7jb_bt]))
+ano2025_bv <- ano2025_bv %>%
+  mutate(bv_km_bt = unname(bv_var[bv_7jb_bt]))
+```
+
+### 7JB-SI Jordbruk: Slåtteintensitet
+
+Er det samme som bv_7jb_si-kolonnene i datasettet. 7JB-SI er ikke videreført i NiN 3.0, og oversettes derfor ikke.
+
+### 7TK Spor etter ferdsel med tunge kjøretøy
+
+Er det samme som bv_7tk-kolonnene i datasettet. I NiN 3.0 oversettes denne til KM-TK Ferdsel med tunge kjøretøy.
+
+Det er en kongruent relasjon mellom NiN 2.3 og NiN 3.0 for denne variabelen. Vi oversetter derfor 7SE kolonnen direkte til KM-TK.
+
+```{r}
+ano2024_bv <- ano2024_bv %>%
+  mutate(bv_km_tk = str_replace(bv_7tk, "^7TK_", "KM-TK_"))
+ano2025_bv <- ano2025_bv %>%
+  mutate(bv_km_tk = str_replace(bv_7tk, "^7TK_", "KM-TK_"))
+
+```
+
+### 7SE Spor etter slitasje og slitasjebetinget erosjon
+
+Er det samme som bv_7se-kolonnene i datasettet. I NiN 3.0 oversettes denne til KM-SE Slitasjebetinget erosjon.
+
+Det er en kongruent relasjon mellom NiN 2.3 og NiN 3.0 for denne variabelen. Vi oversetter derfor 7SE kolonnen direkte til KM-SE.
+
+```{r}
+
+ano2024_bv <- ano2024_bv %>%
+  mutate(bv_km_se = str_replace(bv_7se, "^7SE_", "KM-SE_"))
+ano2025_bv <- ano2025_bv %>%
+  mutate(bv_km_se = str_replace(bv_7se, "^7SE_", "KM-SE_"))
+```
+
+## 6.3 Eksporter resultater
+
+```{r}
+ano2024_bv %>% write.csv("data/ano2024_bv.csv", row.names = F)
+ano2025_bv %>% write.csv("data/ano2025_bv.csv", row.names = F)
+```

@@ -1,0 +1,100 @@
+---
+title: "5. Bestem usikkerhet i de automatiske oversettelsene fra NiN 2.3 til NiN 3.0"
+format: 
+  pdf: 
+    code-fold: false
+execute: 
+  output: false
+---
+
+Figur 3 i Halvorsen (2025) viser rangering av oversettelser mellom NiN 2.3 og NiN 3.0 grunntyper med hensyn til oppført følsomhetspresisjon (FP) og spesifiseringsevne (SP). Vi bruker denne for å bestemme usikkerhet i oversettelsene.
+
+```{r}
+#| echo: false
+#| output: true
+#| out.width: "80%"
+
+
+knitr::include_graphics("fig/halvorsen2025_fig3.png")
+
+```
+
+***Figur 1*****.** Figur 3 i Halvorsen (2025).
+
+ 
+
+```{r, echo=FALSE, results='hide'}
+
+# Sett tegnkodingen for teksthåndtering til norsk bokmål med UTF-8-encoding 
+Sys.setlocale("LC_CTYPE", "nb_NO.UTF-8")  
+
+# Last inn pakker 
+packages <- c("dplyr") 
+sapply(packages, require, character.only = TRUE)  
+```
+
+## 5.1 Sett opp rangeringsmatrise som tabell
+
+Vi bruker Fig.3 og beskrivelsene av svært gode til dårlige oversettelser i Halvorsen (2025).
+
+```{r}
+
+# Sett opp Fig.3 i Halvorsen (2025) som tabell
+df_usikkerhet <- tibble::tribble(
+  ~FP, ~SP, ~rangering,
+   4,   4,    1, 
+   4,   3,    2, 
+   4,   2,    4, 
+   4,   1,    8,
+
+   3,   4,    3,
+   3,   3,    5,
+   3,   2,    6,
+   3,   1,   11,
+
+   2,   4,    7,
+   2,   3,    9,
+   2,   2,   10,
+   2,   1,   13,
+
+   1,   4,   12,
+   1,   3,   14,
+   1,   2,   15,
+   1,   1,   16
+)
+
+# Legg til sikkerhet
+df_usikkerhet <- df_usikkerhet %>%
+  mutate(sikkerhet = case_when(
+    rangering == 1                     ~ "Svært god oversettelse", #Svart boks i Figur 1
+    rangering == 2                     ~ "God oversettelse",       #Mørkerød boks i Figur 1
+    rangering >= 3 &  rangering <= 6   ~ "Akseptabel oversettelse",#Rød boks i Figur 1
+    rangering >= 7 &  rangering <= 16  ~ "Dårlig oversettelse"     #Lyserød boks i Figur 1
+
+  ))
+```
+
+## 5.2 Legg til usikkerhet i ANO-data
+
+Last inn ANO data med NiN 3.0 kartleggingsenheter og legg til usikkerhet i datasettene.
+
+```{r}
+df_ano_NiN3_KE_1m2      <- read.csv("data/df_ano_NiN3_KE_1m2.csv")
+df_ano_NiN3_KE_250m2    <- read.csv("data/df_ano_NiN3_KE_250m2.csv")
+
+df_ano_NiN3_KE_u_1m2    <- df_ano_NiN3_KE_1m2 %>%
+                              left_join(df_usikkerhet, by=c("FP", "SP")) %>%
+                              select(-rangering)
+
+df_ano_NiN3_KE_u_250m2  <- df_ano_NiN3_KE_250m2 %>%
+                              left_join(df_usikkerhet, by=c("FP", "SP")) %>%
+                              select(-rangering)
+```
+
+## 5.3 Eksporter resultater
+
+```{r}
+
+df_ano_NiN3_KE_u_1m2    %>% write.csv("data/df_ano_NiN3_KE_u_1m2.csv", row.names = F)
+df_ano_NiN3_KE_u_250m2  %>% write.csv("data/df_ano_NiN3_KE_u_250m2.csv", row.names = F)
+```

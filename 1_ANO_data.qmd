@@ -1,0 +1,110 @@
+---
+title: "1. Laste inn og forberede ANO-data"
+format: 
+  pdf: 
+    code-fold: false
+execute: 
+  output: false
+---
+
+```{r, echo=FALSE, results='hide'}
+
+# Sett tegnkodingen for teksthåndtering til norsk bokmål med UTF-8-encoding
+Sys.setlocale("LC_CTYPE", "nb_NO.UTF-8")
+
+# Last inn pakker
+packages <- c("dplyr","sf", "purrr")
+sapply(packages, require, character.only = TRUE)
+
+
+```
+
+## 1.1 Last ned ANO-data
+
+ANO-data kan lastes ned fra [Miljødirektorates kartkatalog](https://kartkatalog.miljodirektoratet.no/Dataset/Details/2054).
+
+Dataene i dette prosjektet er lastet ned som en filgeodatabase (gdb) med siste eksportdato 21.05.2025. Disse dataene inneholder kun data samlet inn mellom 2018-2024.
+
+For å også inkludere data for 2025 fikk vi tilsendt disse dataene fra Miljødirektoratet. De tilsendte dataene inneholdt også bilder av ruter, og fordi dette gjør datasettets størrelse for stort til å kunne lagres på Github, er bildene fjernet fra fila (ikke vist her). Den originale filen var en filgeodatabase, men den er gjort om til en Geopackage (gpkg).
+
+## 1.2 Last inn data
+
+Før dataene lastes inn må de pakkes ut (ikke vist her).
+
+ANO 2020-2024 er en filgeodatabase (gdb) og ANO 2025 er en geopackage (gpkg). Begge inneholder flere lag hvor det kun er "surveyPoint" som er relevant til videre prosessering.
+
+```{r}
+
+
+# Last inn 2020-2024 data
+ano2024   <- st_read("data/naturovervaking_eksport.gdb", layer="ANO_SurveyPoint")
+
+# Last inn 2025 data
+ano2025   <- st_read("data/ANO2025.gpkg", layer="surveypoint")
+
+```
+
+## 1.3 Forbered data
+
+Begge datasettene består av flere kolonner som ikke er nødvendig å ha med videre. De kolonnene vi trenger er:
+
+-   Unik ID for hver observasjon. Hvert ANO-punkt skal ha en unik ID (ano_punkt_id), men pga feilregistreringer i felt vil noen av disse være duplisert. Derfor vil den unike ID-en være globalid som er hver observasjons unike ID. Denne kan brukes for å koble NiN-data mot f.eks. artsfunn i ANO-punktet.
+
+-   Kolonner med som viser til NiN kartleggingsenhetkode. Disse er "kartleggingsenhet_1m2", "kartleggingsenhet_250m2".
+
+Vi lager derfor ett nytt datasett hvor de to datasettene først forenkles og deretter slås sammen til ett datasett.
+
+```{r}
+
+valgte_kolonner <- c("globalid", "kartleggingsenhet_1m2", "kartleggingsenhet_250m2")
+
+df_ano2024  <- ano2024 %>%
+                # Selekter aktuelle kolonner
+                select(all_of(valgte_kolonner)) %>%
+                # Fjern geometrien ettersom dette ikke er noe vi trenger å ha med videre
+                st_drop_geometry()
+
+df_ano2025  <- ano2025 %>%
+                # Selekter aktuelle kolonner
+                select(all_of(valgte_kolonner)) %>%
+                # Fjern geometrien ettersom dette ikke er noe vi trenger å ha med videre
+                st_drop_geometry()
+
+# Slå sammen datasett
+df_ano      <- rbind(df_ano2024, df_ano2025)
+
+```
+
+For å kunne oversette dataene først til NiN 2.3 grunntyper (se 2_NiN2.3_KE_til_GT) må de skrives som en kode (f.eks. V1-C-1) og ikke med navn (V1-C-1 svært og temmelig kalkfattige myrflater). Undersøk datasettet nærmere for å sjekke om formatet er standardisert for oversetting til NiN 3.0.
+
+```{r}
+
+
+unique_vals   <- df_ano %>%
+                  select(-globalid) %>%
+                  map(unique)
+```
+
+Begge NiN kolonnene har varierende skrivemåter. Oppdaterer derfor begge kolonnene slik at de kun inneholder NiN 2.3 kode for kartleggingsenhet (KE).
+
+```{r}
+
+
+df_ano        <- df_ano %>%
+                  # Fjerner all tekst etter første mellomrom slik at f.eks. "T27-C-3 kalkrik blokkmark" blir til "T27-C-3"
+                    mutate(
+                      kartleggingsenhet_1m2 = sub(" .*", "", kartleggingsenhet_1m2),
+                      kartleggingsenhet_250m2 = sub(" .*", "", kartleggingsenhet_250m2)
+                      )
+
+```
+
+## 1.4 Eksporter data
+
+Eksporter det prosesserte datasettet og gå videre til neste skript.
+
+```{r}
+
+
+df_ano  %>% write.csv("data/df_ano.csv", row.names = F)
+```

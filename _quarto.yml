@@ -1,0 +1,34 @@
+project:
+  type: book
+
+date-format: "DD.MM.YYYY"
+lang: nb
+
+book:
+  title: "Oversetting av ANO-data fra NiN 2.3 NiN 3.0"
+  author: "Ida M. Mienna, Lise Tingstad"
+  date: today
+
+
+  chapters:
+    - index.qmd
+    - 1_ANO_data.qmd
+    - 2_NiN2.3_KE_til_GT.qmd
+    - 3_NiN2.3_GT_til_NiN3.0_GT.qmd
+    - 4_NiN3.0_GT_til_KE.qmd
+    - 5_usikkerhet.qmd
+    - 6_bv_oversettelse.qmd
+    - 7_manuell_oversettelse.qmd
+    - referanser.qmd
+
+format:
+  pdf:
+    toc: true
+    toc-location: after-body
+    number-sections: false
+    code-line-numbers: false
+    code-wrap: true
+    monofont: 'DejaVu Sans Mono'
+    monofontoptions: 'Scale=0.7'
+    include-in-header:
+      - latex/codewrap.tex

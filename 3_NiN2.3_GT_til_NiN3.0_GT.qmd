@@ -1,0 +1,238 @@
+---
+title: "3. Oversett ANO NiN 2.3 grunntyper til NiN 3.0 grunntyper"
+format: 
+  pdf: 
+    code-fold: false
+execute: 
+  output: false
+---
+
+```{r, echo=FALSE, results='hide'}
+# Sett tegnkodingen for teksthåndtering til norsk bokmål med UTF-8-encoding 
+Sys.setlocale("LC_CTYPE", "nb_NO.UTF-8")  
+
+# Last inn pakker 
+packages <- c("dplyr","sf", "stringr", "purrr","tidyr") 
+sapply(packages, require, character.only = TRUE)  
+```
+
+## 3.1 Hent oversettelsesnøkkel fra Artsdatabanken
+
+Oversettelsesnøkkel mellom NiN 2.3 grunntyper og NiN 3.0 grunntyper hentes fra Artsdatabankens API.
+
+```{r}
+# Last ned Excel-fil med oversikt over NiN3
+download.file(url = "https://nin-kode-api.artsdatabanken.no/v3.0/rapporter/exceldata",
+              destfile = "data/nin3.xlsx")
+
+# Les inn oversettelsesnøkkelen mellom grunntyper
+GT_konvertering   <- readxl::read_excel("data/nin3.xlsx", sheet = "GT_Konvertering")
+```
+
+## 3.2 Oversett NiN 2.3 GT til NiN 3.0 GT
+
+For å oversette mellom NiN 2.3 og NiN 3.0 brukes den nedlastede GT_konvertering-tabellen og de to ANO-datasettene for 1m2 og 250m2 nivå.
+
+```{r}
+# Funksjon for å oversette
+convert_GTs   <- function(df_ano, GT_konvertering) {
+  
+  df_ano %>%
+    left_join(GT_konvertering %>% 
+                select(ForrigeKode, Kode),
+              by = c("ano_GT" = "ForrigeKode"))
+}
+
+```
+
+Kjør funksjonen over på de to datasettene.
+
+```{r}
+# Last inn data
+df_ano_GT_1m2         <- read.csv("data/df_ano_GT_1m2.csv")
+df_ano_GT_250m2       <- read.csv("data/df_ano_GT_250m2.csv")
+
+# Kjør funksjonen på hvert datasett
+df_ano_NiN3_GT_1m2    <- convert_GTs(df_ano_GT_1m2, GT_konvertering)
+df_ano_NiN3_GT_250m2  <- convert_GTs(df_ano_GT_250m2, GT_konvertering)
+
+```
+
+Undersøk de to oversatte datasettene.
+
+```{r}
+df_ano_NiN3_GT    <- df_ano_NiN3_GT_1m2 %>%
+                      select(-globalid, -kartleggingsenhet_1m2) %>%
+                      bind_rows(
+                        df_ano_NiN3_GT_250m2 %>%
+                          select(-globalid, -kartleggingsenhet_250m2) 
+                      ) %>%
+                      unique()
+
+```
+
+```{r}
+#| echo: false
+#| output: true
+cat("Antall NiN3 GT med NA: ", sum(is.na(df_ano_NiN3_GT$Kode)), "\n")
+cat("Antall NiN3 GT med ikke-NA: ", sum(!is.na(df_ano_NiN3_GT$Kode)), "\n")
+```
+
+Flertallet av grunntypene ble ikke oversatt. Ved nærmere undersøkelse i Artsdatabankens API Excel-ark for konvertering ser man at denne ikke er fullstendig. Må derfor bruke en annen løsning.
+
+## 3.3 Løsning 2 - bruk oversettelsesnøkkel fra NiN 3.0 systemdokumentasjon
+
+I Halvorsen (2025) Vedlegg 6 finnes det en oversettelsesnøkkel mellom NiN 2.3 og NiN 3 grunntyper. Oversettelsesnøkkelen splitter grunntypekoden i to kolonner (hovedtype (HT) og grunntype (GT)) hvor grunntype kan bestå av flere typer. Vil ha én grunntype per rad med kode i én kolonne. Det er noen NiN 2.3 grunntyper som oversettes til flere hovedtyper, men dette håndteres senere under manuell oversetting.
+
+```{r}
+nin3_oversettelsnokkel    <- readxl::read_excel("data/NiN3SD2_Vedlegg.xlsx", 
+                                             sheet="V6_NATSYST_FRA_2.3_TIL_3.0",
+                                             # Hopp over de to første radene
+                                             skip = 2)
+```
+
+Datasettet må forberedes litt før den kan brukes som oversettelsesnøkkel. HT kan ha flere typer samtidig som GT har det. Dette er i Excel-arket håndtert ved å legge til spesiell whitespace ("vognretur" og linjeskift). Vi bruker dette her for å fordele GT til riktig HT.
+
+```{r}
+
+# Lag funksjon som fordeler GT til HT 
+pair_safe <- function(ht, gt) {
+  
+  n_ht <- length(ht)
+  n_gt <- length(gt)
+
+  if (n_ht == n_gt) {
+    tibble(HT = ht, GT = gt)
+  } else if (n_gt > n_ht) {
+    tibble(HT = ht, GT = gt[1:n_ht])     # truncate GT
+  } else {
+    tibble(HT = ht, GT = c(gt, rep(NA, n_ht - n_gt)))  # pad GT
+  }
+}
+
+# Bruk funksjonen over til å håndtere det at HT og GT kan ha flere typer i seg hvor disse skal fordeles
+nin3_oversettelsnokkel  <- nin3_oversettelsnokkel %>%
+                            
+                            mutate(
+                              # Del opp i flere rader basert på spesiell whitespace ("vognretur" og linjeskift)
+                              HT_split_raw = str_split(HT, "[\\r\\n]+"),
+                              GT_split_raw = str_split(GT, "[\\r\\n]+"),
+                              
+                              # Fjern whitespace
+                              HT_split_raw = map(HT_split_raw, ~ str_trim(.x)),
+                              GT_split_raw = map(GT_split_raw, ~ str_trim(.x)),
+                              
+                              # Fjern "'" fra GT. Disse ser ut til å kun brukes for å vise når det er et skille mellom GT til forskjellige HT
+                              GT_split_raw = map(GT_split_raw, ~ gsub("'", "", .x))
+                              ) %>%
+  
+                            # Kjør funksjonen over for de nye HT og GT kolonnene
+                            mutate(pair = map2(HT_split_raw, GT_split_raw, pair_safe)) %>%
+                            select(-HT_split_raw, -GT_split_raw) %>%
+                            unnest(pair, names_sep = "_paired_") %>%
+                            rename(HT_old = HT,
+                                   GT_old = GT,
+                                   HT = pair_paired_HT,
+                                   GT = pair_paired_GT
+                                   ) 
+
+# Fordel hovedtyper over flere rader hvor det er flere enn én hovedtype
+nin3_oversettelsnokkel  <- nin3_oversettelsnokkel %>%
+                              mutate(
+                                # Bytt ut "." etter NA med "-"
+                                HT = gsub("\\.", "-", HT),
+                                # Fjern "," fra HT
+                                HT = gsub(",","",HT)
+                                )
+
+# Fordel grunntyper over flere rader hvor det er flere enn én grunntype
+nin3_oversettelsnokkel  <- nin3_oversettelsnokkel %>%
+                            # Del opp GT i flere rader etter "," eller mellomrom
+                            separate_rows(GT, sep = ",|\\s+") %>%
+                            # Hvis GT er tom, men ikke NA, legg til NA
+                            mutate(GT = ifelse(GT == "", NA, GT)) %>%
+                            # Noen GT med verdi mellom 1-9 mangler 0 foran
+                            mutate(
+                              GT = if_else(str_detect(GT, "^\\d$"),
+                                           paste0("0", GT),
+                                           GT)
+                            )
+
+# Lag kolonne for grunntypekode (HT-GT)
+nin3_oversettelsnokkel <- nin3_oversettelsnokkel %>%
+                            # Sett sammen HT og GT til én kolonne. Hvis GT er NA, legg til kun HT
+                            mutate(ano_GT_NiN3_0 = if_else(is.na(GT),HT,paste0(HT, "-", GT))
+                                   ) %>%
+                            # Hvis HT er NA, gjør ano_GT_NiN3_0 til NA
+                            mutate(ano_GT_NiN3_0 = ifelse(is.na(HT), NA, ano_GT_NiN3_0)
+                                   )
+```
+
+## 3.4 Oversett ved bruk av oversettelsesnøkkel
+
+```{r}
+# Funksjon for å oversette
+convert_GTs_H <- function(df_ano, nin3_oversettelsnokkel) {
+  
+  df_ano %>%
+    # Fjern "NA " fra ano_GT
+    mutate(ano_GT_NiN2_3 = str_replace_all(ano_GT, "NA ", "")) %>%
+    # Legg til oversettelsesnøkkel
+    left_join(nin3_oversettelsnokkel %>% 
+                select(Kode, ano_GT_NiN3_0, HT, GT, FP, SP),
+              by = c("ano_GT_NiN2_3" = "Kode"))
+}
+```
+
+Kjør funksjonen over på de to datasettene.
+
+```{r}
+# Last inn data
+df_ano_GT_1m2           <- read.csv("data/df_ano_GT_1m2.csv")
+df_ano_GT_250m2         <- read.csv("data/df_ano_GT_250m2.csv")
+
+# Kjør funksjonen på hvert datasett
+df_ano_NiN3_GT_H_1m2    <- convert_GTs_H(df_ano_GT_1m2, nin3_oversettelsnokkel)
+df_ano_NiN3_GT_H_250m2  <- convert_GTs_H(df_ano_GT_250m2, nin3_oversettelsnokkel)
+```
+
+Undersøk de to oversatte datasettene.
+
+```{r}
+df_ano_NiN3_GT_H        <- df_ano_NiN3_GT_H_1m2 %>%
+                              select(-globalid, -kartleggingsenhet_1m2) %>%
+                              bind_rows(
+                                df_ano_NiN3_GT_H_250m2 %>%
+                                  select(-globalid, -kartleggingsenhet_250m2) 
+                              ) %>%
+                              # Ikke inkluder de som er NA i GT ettersom disse håndteres senere
+                              filter(!is.na(ano_GT_NiN2_3))%>%
+                              unique()
+
+
+```
+
+```{r}
+#| echo: false
+#| output: true
+cat("Antall NiN3 GT med NA: ", sum(is.na(df_ano_NiN3_GT_H$ano_GT_NiN3_0)), "\n")
+cat("Antall NiN3 GT med ikke-NA: ", sum(!is.na(df_ano_NiN3_GT_H$ano_GT_NiN3_0)), "\n")
+```
+
+Kun tre typer oversettes ikke automatisk:
+
+```{r}
+#| echo: false
+#| output: true
+cat("NiN 2.3 grunntyper som ikke ble oversatt:", df_ano_NiN3_GT_H$ano_GT_NiN2_3[is.na(df_ano_NiN3_GT_H$ano_GT_NiN3_0)], "\n")
+
+```
+
+Disse tre typene (T27-1, T27-3 og T17-1) er beskrevet i Halvorsen (2025) for hvorfor de ikke kan oversettes.
+
+## 3.5 Eksporter resultater
+
+```{r}
+df_ano_NiN3_GT_H_1m2    %>% write.csv("data/df_ano_NiN3_GT_H_1m2.csv", row.names = F)
+df_ano_NiN3_GT_H_250m2  %>% write.csv("data/df_ano_NiN3_GT_H_250m2.csv", row.names = F)
+```
